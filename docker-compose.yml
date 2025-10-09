@@ -270,8 +270,9 @@ networks:
 #
 # 4. ACCESS SERVICES:
 #    - Timebase Explorer: http://localhost:4531
-#    - Historian API: http://localhost:4511
-#    - Collector API: http://localhost:4521
+#    - Historian:         http://localhost:4511
+#    - Collector 01:      http://localhost:4521
+#    - Collector 02:      http://localhost:4522
 #
 # 5. STOP THE STACK:
 #    docker-compose down                       # Stop and remove containers
