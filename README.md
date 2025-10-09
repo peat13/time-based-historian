@@ -1,4 +1,4 @@
-# Free Industrial Historian Docker Stack | Timebase Historian for IoT & SCADA
+# Timebase Historian Docker Stack
 
 ![Hero Image](images/Hero-image.png)
 
