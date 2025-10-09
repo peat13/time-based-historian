@@ -118,16 +118,30 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        dotnet Timebase.Explorer.UI.dll &
-        EXPLORER_PID=$$!
-        for i in 1 2 3 4 5 6 7 8 9 10; do
-          sleep 1
-          if [ -f /explorer/config/sources.config ]; then
-            sed -i 's/"Host": "localhost"/"Host": "${HISTORIAN_HOSTNAME:-historian}"/g' /explorer/config/sources.config 2>/dev/null
-            break
-          fi
-        done
-        wait $$EXPLORER_PID
+        mkdir -p /explorer/config
+        cat > /explorer/config/sources.config <<EOF
+        {
+          "Historians": {
+            "Local": {
+              "Name": "Local",
+              "Host": "${HISTORIAN_HOSTNAME:-historian}",
+              "Port": 4511,
+              "UseTls": false,
+              "Auth": {
+                "Enabled": false,
+                "IdP": {
+                  "Host": "localhost",
+                  "Port": 4542,
+                  "UseTls": true
+                },
+                "ClientId": "",
+                "ClientSecret": ""
+              }
+            }
+          }
+        }
+        EOF
+        exec dotnet Timebase.Explorer.UI.dll
 
     logging:
       driver: json-file
