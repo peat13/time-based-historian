@@ -1,13 +1,6 @@
 # Time Based Local Historian Stack
 
-```plaintext
-████████╗ ██╗ ███╗   ███╗ ███████╗    ██████╗   █████╗  ███████╗ ███████╗ ██████╗ 
-╚══██╔══╝ ██║ ████╗ ████║ ██╔════╝    ██╔══██╗ ██╔══██╗ ██╔════╝ ██╔════╝ ██╔══██╗
-   ██║    ██║ ██╔████╔██║ █████╗      ██████╔╝ ███████║ ███████╗ █████╗   ██║  ██║
-   ██║    ██║ ██║╚██╔╝██║ ██╔══╝      ██╔══██╗ ██╔══██║ ╚════██║ ██╔══╝   ██║  ██║
-   ██║    ██║ ██║ ╚═╝ ██║ ███████╗    ██████╔╝ ██║  ██║ ███████║ ███████╗ ██████╔
-   ╚═╝    ╚═╝ ╚═╝     ╚═╝ ╚══════╝    ╚═════╝  ╚═╝  ╚═╝ ╚══════╝ ╚══════╝ ╚═════╝ 
-```
+![Hero Image](images/Hero-image.png)
 
 A complete, beginner-friendly Docker Compose stack for deploying a local Industrial Historian infrastructure. This stack provides everything you need to start collecting, storing, and visualizing time-series data.
 
@@ -213,3 +206,20 @@ docker run --rm -v timebase-historian-data:/data -v $(pwd):/backup ubuntu tar xz
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+### Ready to Take Your Industrial Architecture to the Next Level?
+
+<br>
+<br>
+
+<a href="https://abelara.com" target="_blank">
+  <img src="images/Abelara_Logo_Primary_FullColor_W_RGB.png" alt="Abelara - Industrial Automation & Controls" width="300">
+</a>
+
+[Visit Abelara.com →](https://abelara.com)
+
+</div>
