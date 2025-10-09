@@ -176,20 +176,20 @@ services:
   # Uncomment the lines below to add a second collector.
   # Customize the environment variables in example.env if needed.
   # ------------------------------------------------------------------------------------------------
-  # timebase-collector-02:
-  #   <<: *collector-template
-  #   container_name: ${COLLECTOR_02_CONTAINER_NAME:-collector-02}
-  #   hostname: ${COLLECTOR_02_HOSTNAME:-collector-02}
-  #   environment:
-  #     Active: ${COLLECTOR_02_ACTIVE:-false}
-  #     Settings: /collector/settings
-  #     Config: /collector/config
-  #     Data: /collector/data
-  #     Logs: /collector/logs
-  #   ports:
-  #     - "${COLLECTOR_02_PORT:-4522}:4521"
-  #   volumes:
-  #     - collector-02-data:/collector
+  timebase-collector-02:
+    <<: *collector-template
+    container_name: ${COLLECTOR_02_CONTAINER_NAME:-collector-02}
+    hostname: ${COLLECTOR_02_HOSTNAME:-collector-02}
+    environment:
+      Active: ${COLLECTOR_02_ACTIVE:-false}
+      Settings: /collector/settings
+      Config: /collector/config
+      Data: /collector/data
+      Logs: /collector/logs
+    ports:
+      - "${COLLECTOR_02_PORT:-4522}:4521"
+    volumes:
+      - collector-02-data:/collector
 
   # ------------------------------------------------------------------------------------------------
   # 💡 EXAMPLE: Adding a third collector
@@ -234,8 +234,8 @@ volumes:
     name: ${COLLECTOR_01_VOLUME_NAME:-timebase-collector-01-data}
 
   # Uncomment these if you add collector-02 and collector-03
-  # collector-02-data:
-  #   name: ${COLLECTOR_02_VOLUME_NAME:-timebase-collector-02-data}
+  collector-02-data:
+    name: ${COLLECTOR_02_VOLUME_NAME:-timebase-collector-02-data}
   # collector-03-data:
   #   name: ${COLLECTOR_03_VOLUME_NAME:-timebase-collector-03-data}
 
