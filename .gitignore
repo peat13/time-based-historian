@@ -26,3 +26,6 @@ volumes/
 # Ignore build artifacts
 build/
 dist/
+
+#Claude Code
+.claude/

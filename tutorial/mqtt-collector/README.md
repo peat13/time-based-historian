@@ -27,7 +27,11 @@ This tutorial will guide you through configuring the Timebase MQTT Collector to 
 5. [Verifying Data Collection](#verifying-data-collection)
 6. [Viewing Data in Explorer](#viewing-data-in-explorer)
 7. [Troubleshooting](#troubleshooting)
-8. [Next Steps](#next-steps)
+8. [Understanding Payload Types](#understanding-payload-types)
+9. [Advanced: Secure Broker Authentication](#advanced-secure-broker-authentication)
+10. [Advanced: Metadata Extraction with Fields](#advanced-metadata-extraction-with-fields)
+11. [Advanced: Tag Filtering with Regex](#advanced-tag-filtering-with-regex)
+12. [Next Steps](#next-steps)
 
 ---
 
@@ -149,12 +153,15 @@ Now that we have a broker and topic, let's configure the Timebase Collector.
 
 Before adding configurations, make sure the collector is active:
 
-1. Look for the **"Active"** setting or toggle
+1. Look for the **"Active"** setting or toggle in the Collector UI
 2. Set it to **`true`** or enable it
 3. The collector needs to be active to collect data
 
-**Alternatively**, update your `.env` file:
+**Note:** The "Active" setting is at the **collector container level** (environment variable in docker-compose.yml), not part of the MQTT plugin configuration JSON. This controls whether the entire collector service is running.
+
+**Via environment variable** in `.env` file:
 ```bash
+# This is a collector-level setting, not an MQTT plugin setting
 COLLECTOR_01_ACTIVE=true
 ```
 
@@ -162,6 +169,10 @@ Then restart the stack:
 ```bash
 docker-compose restart timebase-collector-01
 ```
+
+**Configuration file location:**
+- **Docker**: `/collector/config`
+- **Windows**: `C:\ProgramData\Flow Software\Timebase\Collector\Config`
 
 ### Step 3: Create MQTT Plugin Configuration
 
@@ -216,7 +227,7 @@ Navigate to the **Plugins** or **Configuration** section and create a new MQTT p
 | `TagnameFields.Default` | `mosquitto.messages_per_minute` | Tag name in Historian |
 | `TagnameIncludesTopic` | `false` | Don't include topic name in tag |
 | `TagnameDelimiter` | `.` | Delimiter for hierarchical tag names |
-| `QoS` | `2` | MQTT Quality of Service (0, 1, or 2) |
+| `QoS` | `2` | MQTT Quality of Service: `0`=At most once, `1`=At least once, `2`=Exactly once |
 
 ### Step 4: Save and Apply Configuration
 
@@ -426,13 +437,15 @@ Timebase MQTT Collector supports three different payload types, each designed fo
 
 | Feature | Type 1: Simple Primitives | Type 2: Simple JSON | Type 3: Structured JSON |
 |---------|---------------------------|---------------------|-------------------------|
-| **Data Format** | Single value (number, string, boolean) | Flat JSON object with key-value pairs | Nested JSON with arrays and metadata |
-| **Topics per Tag** | One topic = one tag | One topic = multiple tags | One topic = multiple tags with metadata |
-| **Timestamp Source** | Message arrival time | Message arrival time | Embedded in payload |
-| **Quality/Status** | Not supported | Not supported | Supported (optional field) |
+| **Data Format** | Single value (number, string, boolean) | JSON with path-based tagnames (flat or nested) | JSON with dedicated name/value fields |
+| **Tagname Source** | Topic path | JSON structure/path | Dedicated field (e.g., `"name"`) |
+| **Topics per Tag** | One topic = one tag | One topic = multiple tags | One topic = multiple tags |
+| **Timestamp Source** | Message arrival time | Message arrival time | Embedded in payload (optional) |
+| **Quality/Status** | Not supported | Not supported | Supported (via QualityField) |
+| **Nesting** | N/A | Fully supported | Fully supported |
 | **Complexity** | Simplest | Moderate | Advanced |
-| **Performance** | Fastest | Fast | Slower (parsing overhead) |
-| **Use Case** | Single sensor per topic | Multi-sensor device | Industrial systems, Sparkplug B |
+| **Performance** | Fastest | Fast | Slower (more parsing) |
+| **Use Case** | Single sensor per topic | Multi-sensor devices, APIs | Industrial SCADA, Sparkplug B |
 
 ### Identifying Type 1: Simple Primitives
 
@@ -482,11 +495,24 @@ home/livingroom/temperature 22.3
 **How to identify:**
 1. Subscribe to the topic
 2. Payload is valid JSON
-3. JSON is a flat object (no nested objects or arrays)
+3. JSON uses **path-based tagnames** - the JSON structure itself defines tag names
 
 **The payload looks like Type 2 if you see:**
 ```json
 {"temperature": 22.3, "humidity": 45, "pressure": 1013}
+```
+
+**Or even nested JSON:**
+```json
+{
+  "motor1": {
+    "rpm": 23.6,
+    "location": {
+      "long": 12.3,
+      "lat": 34.7
+    }
+  }
+}
 ```
 
 **You'll see this from:**
@@ -506,15 +532,16 @@ weather/station1 {"temp":22.4,"hum":45.1,"press":1013,"wind":5.3}
 
 **Key characteristics:**
 - It's valid JSON (starts with `{`, ends with `}`)
-- All values at the top level (no nesting)
-- All values are primitives (numbers, strings, booleans)
-- No timestamp field (or you don't care about it)
+- Uses JSON **paths** as tagnames (e.g., `motor1.rpm`, `motor1.location.long`)
+- Can be flat OR nested - **nesting is supported**
+- Values are extracted from the JSON structure
+- No dedicated "name" or "value" fields (unlike Type 3)
 
 **Why this format exists:**
-- Atomicity: All measurements from the same instant
-- Efficiency: One message for related data
-- Self-documenting: Field names show what each value means
-- Extensible: Easy to add new fields
+- Self-documenting: JSON structure defines tag hierarchy
+- Flexible nesting: Can represent complex device structures
+- Efficient: One message for multiple related measurements
+- Natural fit for modern APIs and devices
 
 ---
 
@@ -523,7 +550,8 @@ weather/station1 {"temp":22.4,"hum":45.1,"press":1013,"wind":5.3}
 **How to identify:**
 1. Subscribe to the topic
 2. Payload is valid JSON
-3. JSON has nested objects, arrays, or embedded timestamps
+3. JSON uses **dedicated fields** for tagnames, values, and metadata (like `"name"`, `"value"`, `"timestamp"`)
+4. Often has an array of measurements (`metrics[]`) rather than direct key-value pairs
 
 **The payload looks like Type 3 if you see:**
 ```json
@@ -625,13 +653,15 @@ sensors/data {"metrics":[{"name":"temp","value":23.5}]}
 Look at the payload:
 
 Is it JSON?
-├─ NO → Type 1
-└─ YES → Does it have a "timestamp" or "ts" field?
-    ├─ YES → Type 3
-    └─ NO → Does it have arrays or nested objects?
-        ├─ YES → Type 3
-        └─ NO → Type 2 (simple flat JSON)
+├─ NO → Type 1 (Simple Primitives)
+└─ YES → Does it have dedicated "name" and "value" fields for metrics?
+    ├─ YES → Type 3 (Structured JSON - data-based tagnames)
+    └─ NO → Type 2 (Simple JSON - path-based tagnames)
 ```
+
+**Key distinction:**
+- **Type 2**: The JSON **structure** defines tag names (`motor1.rpm` from `{"motor1": {"rpm": 23.6}}`)
+- **Type 3**: A specific **field** defines tag names (`"name": "temperature"` in a metrics array)
 
 ### Step 4: Test with a Simple Configuration
 
@@ -711,9 +741,17 @@ Payload: 23.5
 - Value: `23.5`
 - Timestamp: Time the message was received
 
+**How Type 1 Tagnames Work:**
+
+By default, Type 1 uses the **topic path as the tagname**. The `TagnameFields.Default` parameter allows you to override this base name, and `TagnameIncludesTopic` controls whether topic segments are appended.
+
+In the example above:
+- `TagnameIncludesTopic: false` → Uses only the `Default` value → Tag: `building.room1.temperature`
+- `TagnameIncludesTopic: true` → Appends topic segments to `Default` → Tag: `building.room1.temperature.sensors.room1.temperature`
+
 **With Topic Inclusion:**
 
-If you set `"TagnameIncludesTopic": true`, the topic segments can be included in the tag name:
+If you set `"TagnameIncludesTopic": true`, the topic segments are appended to the base tag name:
 
 ```json
 {
@@ -791,12 +829,18 @@ The `TagnameFields` object maps JSON keys to tag name suffixes:
 
 ```json
 "TagnameFields": {
-  "Default": "building.room1",      // Base tag name
-  "temperature": "temp",            // JSON key "temperature" → tag suffix "temp"
-  "humidity": "hum",                // JSON key "humidity" → tag suffix "hum"
-  "pressure": "press"               // JSON key "pressure" → tag suffix "press"
+  "Default": "building.room1",
+  "temperature": "temp",
+  "humidity": "hum",
+  "pressure": "press"
 }
 ```
+
+**Field mapping explanation:**
+- `"Default": "building.room1"` - Base tag name
+- `"temperature": "temp"` - JSON key "temperature" → tag suffix "temp"
+- `"humidity": "hum"` - JSON key "humidity" → tag suffix "hum"
+- `"pressure": "press"` - JSON key "pressure" → tag suffix "press"
 
 Final tags are constructed as: `{Default}.{mapped_suffix}`
 
@@ -822,6 +866,56 @@ Final tags are constructed as: `{Default}.{mapped_suffix}`
 This would create:
 - Topic: `sensors/room1/data` → Tags: `building.sensors.room1.data.temp`, `building.sensors.room1.data.hum`
 - Topic: `sensors/room2/data` → Tags: `building.sensors.room2.data.temp`, `building.sensors.room2.data.hum`
+
+**Advanced: Nested JSON with Type 2:**
+
+Type 2 supports **deeply nested JSON** structures. The JSON path becomes the tag name:
+
+**Example Payload:**
+```json
+{
+  "payload": {
+    "timestamp": "2024-07-12T12:15"
+  },
+  "motor1": {
+    "rpm": 23.6,
+    "location": {
+      "long": 12.3,
+      "lat": 34.7
+    }
+  },
+  "motor2": {
+    "rpm": 28.6,
+    "location": {
+      "long": 22.4,
+      "lat": 36.8
+    }
+  }
+}
+```
+
+**Configuration:**
+```json
+{
+  "Type": 2,
+  "Topics": ["factory/motors"],
+  "TagnameFields": {
+    "Default": "facility"
+  },
+  "TagnameDelimiter": ".",
+  "QoS": 2
+}
+```
+
+**Result in Historian:**
+- `facility.motor1.rpm` → `23.6`
+- `facility.motor1.location.long` → `12.3`
+- `facility.motor1.location.lat` → `34.7`
+- `facility.motor2.rpm` → `28.6`
+- `facility.motor2.location.long` → `22.4`
+- `facility.motor2.location.lat` → `36.8`
+
+Notice how the **nested structure** automatically creates hierarchical tag names!
 
 ---
 
@@ -911,6 +1005,271 @@ This would create:
 
 ---
 
+## Advanced: Secure Broker Authentication
+
+For production environments, you'll need to connect to private brokers requiring authentication.
+
+### Basic Authentication
+
+**Configuration with Username and Password:**
+
+```json
+{
+  "Name": "Private-Broker",
+  "Plugin": "MQTT",
+  "Enabled": true,
+  "Settings": {
+    "Host": "private-broker.example.com",
+    "Port": 8883,
+    "UseTls": true,
+    "Username": "your-username",
+    "Password": "your-password",
+    "ClientId": "timebase-collector-01",
+    "Subscriptions": [
+      {
+        "Type": 1,
+        "Topics": ["sensors/#"],
+        "TagnameFields": {"Default": "production"},
+        "QoS": 2
+      }
+    ]
+  }
+}
+```
+
+### Configuration Fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `Username` | Optional | MQTT broker username |
+| `Password` | Optional* | MQTT broker password |
+| `ClientId` | Optional | Custom MQTT client identifier (defaults to auto-generated) |
+| `UseTls` | Optional | Enable TLS/SSL encryption (default: `false`) |
+| `Port` | Optional | Broker port (default: 1883 for non-TLS, 8883 for TLS) |
+
+**Important:** If `Username` is provided, `Password` must also be provided.
+
+### TLS/SSL Configuration
+
+For secure connections:
+
+```json
+{
+  "Host": "secure-broker.example.com",
+  "Port": 8883,
+  "UseTls": true,
+  "Username": "collector",
+  "Password": "secure-password",
+  "ClientId": "timebase-collector-01"
+}
+```
+
+**Ports:**
+- **1883**: Standard MQTT (no encryption)
+- **8883**: MQTT over TLS/SSL (encrypted)
+
+### Client ID Best Practices
+
+The `ClientId` uniquely identifies your collector to the broker:
+
+- **Auto-generated** (default): Timebase creates a unique ID
+- **Custom**: Use descriptive names like `timebase-collector-01`, `factory-floor-collector`
+- **Multiple collectors**: Each must have a unique Client ID
+
+**Example with multiple collectors:**
+```json
+{
+  "ClientId": "timebase-collector-factory-floor-1"
+}
+```
+
+---
+
+## Advanced: Metadata Extraction with Fields
+
+Timebase can extract metadata from MQTT topics and payloads to enrich your tags with contextual information. This is powerful for organizing industrial data hierarchically.
+
+### Static Metadata
+
+Apply the same metadata to all tags in a subscription:
+
+```json
+{
+  "Type": 1,
+  "Topics": ["factory/line1/#"],
+  "TagnameFields": {"Default": "production"},
+  "Fields": {
+    "Enterprise": "ACME Corp",
+    "Site": "Austin",
+    "Area": "Packaging"
+  },
+  "QoS": 2
+}
+```
+
+**Result:** Every tag from `factory/line1/#` will have these metadata fields attached in the Historian.
+
+### Dynamic Metadata from Topics
+
+Extract values from the topic structure using `TopicDefinition`:
+
+```json
+{
+  "Type": 1,
+  "Topics": ["ACME/Austin/Packaging/+"],
+  "TopicDefinition": "enterprise/site/area/machine",
+  "TagnameFields": {"Default": "production"},
+  "Fields": {
+    "Enterprise": "[Topic:enterprise]",
+    "Site": "[Topic:site]",
+    "Area": "[Topic:area]",
+    "Machine": "[Topic:machine]"
+  },
+  "QoS": 2
+}
+```
+
+**How it works:**
+- `TopicDefinition` creates a semantic map of the topic structure
+- `[Topic:segment]` syntax extracts values from specific topic segments
+- Topic `ACME/Austin/Packaging/Capper1` produces:
+  - `Enterprise` = "ACME"
+  - `Site` = "Austin"
+  - `Area` = "Packaging"
+  - `Machine` = "Capper1"
+
+### Dynamic Metadata from Payload
+
+Extract metadata from the JSON payload:
+
+```json
+{
+  "Type": 2,
+  "Topics": ["sensors/data"],
+  "TagnameFields": {"Default": "facility"},
+  "Fields": {
+    "DeviceID": "[Payload:deviceId]",
+    "Location": "[Payload:location.building]"
+  },
+  "QoS": 2
+}
+```
+
+**Example payload:**
+```json
+{
+  "deviceId": "sensor-042",
+  "location": {
+    "building": "Building-A",
+    "floor": 2
+  },
+  "temp": 23.5
+}
+```
+
+**Result:**
+- Tags will have metadata:
+  - `DeviceID` = "sensor-042"
+  - `Location` = "Building-A"
+
+### Complete Example: ISA-95 Hierarchy
+
+```json
+{
+  "Type": 2,
+  "Topics": ["+/+/+/+/data"],
+  "TopicDefinition": "enterprise/site/area/line/data",
+  "TagnameFields": {"Default": "manufacturing"},
+  "Fields": {
+    "Enterprise": "[Topic:enterprise]",
+    "Site": "[Topic:site]",
+    "Area": "[Topic:area]",
+    "Line": "[Topic:line]",
+    "DeviceType": "[Payload:metadata.type]"
+  },
+  "TagnameIncludesTopic": true,
+  "TagnameDelimiter": ".",
+  "QoS": 2
+}
+```
+
+**Topic:** `ACME/Austin/Packaging/Line3/data`
+**Payload:**
+```json
+{
+  "metadata": {"type": "PLC"},
+  "motor1_rpm": 1500,
+  "motor1_temp": 65.4
+}
+```
+
+**Result:**
+- Tag: `manufacturing.ACME.Austin.Packaging.Line3.data.motor1_rpm`
+  - Value: `1500`
+  - Metadata:
+    - `Enterprise`: "ACME"
+    - `Site`: "Austin"
+    - `Area`: "Packaging"
+    - `Line`: "Line3"
+    - `DeviceType`: "PLC"
+
+---
+
+## Advanced: Tag Filtering with Regex
+
+Exclude unwanted tags using the `Filter` field with regex patterns.
+
+### Basic Filtering
+
+```json
+{
+  "Type": 2,
+  "Topics": ["sensors/#"],
+  "TagnameFields": {"Default": "facility"},
+  "Filter": "test|debug",
+  "QoS": 2
+}
+```
+
+**Effect:** Excludes any tagname containing "test" OR "debug"
+
+### Pattern Examples
+
+```json
+{
+  "Filter": "Line 1"
+}
+```
+Excludes tagnames containing "Line 1"
+
+```json
+{
+  "Filter": ".*RPM$"
+}
+```
+Excludes tagnames ending with "RPM"
+
+```json
+{
+  "Filter": "^temp_.*|.*_debug$"
+}
+```
+Excludes tagnames starting with "temp_" OR ending with "_debug"
+
+### Regex Escape Characters
+
+Use `\\` for backslashes in regex:
+
+```json
+{
+  "Filter": "\\\\authors"
+}
+```
+
+**Note:** The `Filter` field defines what to **exclude**, not what to include.
+
+---
+
 ## Next Steps
 
 Congratulations! You've successfully configured MQTT data collection. Here's what to explore next:
@@ -976,12 +1335,29 @@ Scale to multiple data sources:
 
 ### 5. Advanced Configuration
 
-Explore Timebase documentation for:
-- **Structured JSON** payloads
-- **SparkplugB** support
-- **Custom timestamp** parsing
-- **Metadata extraction**
-- **QoS settings**
+You've learned the basics! Now explore advanced features:
+
+- **Metadata extraction**: Use `Fields` and `TopicDefinition` (see [Metadata section](#advanced-metadata-extraction-with-fields))
+- **Tag filtering**: Use `Filter` with regex to exclude unwanted tags (see [Filtering section](#advanced-tag-filtering-with-regex))
+- **Authentication**: Connect to secure brokers (see [Authentication section](#advanced-secure-broker-authentication))
+- **Unit of Measure**: Extract UOM from Type 3 payloads using `UOMFields`
+- **Sparkplug B**: Full support for Sparkplug B protocol (Type 3)
+
+**UOMFields Example (Type 3):**
+```json
+{
+  "Type": 3,
+  "Topics": ["sensors/+"],
+  "TagnameFields": {"Default": "facility"},
+  "ValueField": "value",
+  "UOMFields": ["uom"],
+  "TimestampFields": ["timestamp"],
+  "TimestampType": 2,
+  "QoS": 2
+}
+```
+
+This extracts unit of measure from the `uom` field in your metrics array.
 
 ---
 
