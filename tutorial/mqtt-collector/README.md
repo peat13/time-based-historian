@@ -35,6 +35,9 @@ This tutorial will guide you through configuring the Timebase MQTT Collector to 
 
 ---
 
+<details open>
+<summary><b>📖 Understanding MQTT and Timebase</b></summary>
+
 ## Understanding MQTT and Timebase
 
 ### What is MQTT?
@@ -55,11 +58,19 @@ The Timebase Collector acts as an **MQTT subscriber**:
 4. Parses the message payload
 5. Stores the data in the Historian with timestamps
 
+</details>
+
 ---
+
+<details open>
+<summary><b>🌐 Finding a Public MQTT Broker</b></summary>
 
 ## Finding a Public MQTT Broker
 
-For this tutorial, we'll use a public MQTT broker for testing. Here are some popular options:
+For this tutorial, we'll use **test.mosquitto.org** as it's reliable and well-documented.
+
+<details>
+<summary><b>📋 Click to see other public broker options</b></summary>
 
 ### Option 1: Eclipse Mosquitto Test Server
 
@@ -85,15 +96,27 @@ Port: 1883 (no authentication)
 Topics: Public test environment
 ```
 
-**For this tutorial**, we'll use **test.mosquitto.org** as it's reliable and well-documented.
+</details>
 
 ⚠️ **Security Note:** Public brokers should only be used for testing. Never send sensitive data to public brokers!
 
+</details>
+
 ---
+
+<details open>
+<summary><b>🔎 Discovering Available Topics</b></summary>
 
 ## Discovering Available Topics
 
-Before configuring the collector, let's find an active topic with data.
+**For this tutorial**, we'll use the broker statistics topic: `$SYS/broker/load/messages/received/1min`
+
+This topic publishes the number of messages the broker receives per minute - perfect for testing!
+
+<details>
+<summary><b>🔍 Click to see methods for discovering topics</b></summary>
+
+Before configuring the collector, you can explore available topics using these methods:
 
 ### Method 1: Using MQTT Explorer (Recommended)
 
@@ -127,14 +150,14 @@ mosquitto_sub -h test.mosquitto.org -t '$SYS/broker/clients/connected' -v
 docker run -it --rm eclipse-mosquitto mosquitto_sub -h test.mosquitto.org -t '$SYS/broker/load/messages/received/1min' -v
 ```
 
-**For this tutorial**, we'll use the broker statistics topic:
-```
-$SYS/broker/load/messages/received/1min
-```
+</details>
 
-This topic publishes the number of messages the broker receives per minute - perfect for testing!
+</details>
 
 ---
+
+<details open>
+<summary><b>⚙️ Configuring the Collector</b></summary>
 
 ## Configuring the Collector
 
@@ -151,30 +174,76 @@ Now that we have a broker and topic, let's configure the Timebase Collector.
 
 ### Step 2: Enable the Collector
 
-Before adding configurations, make sure the collector is active:
+Before adding configurations, make sure the collector container is active.
 
-1. Look for the **"Active"** setting or toggle in the Collector UI
-2. Set it to **`true`** or enable it
-3. The collector needs to be active to collect data
+**IMPORTANT:** The `Active` setting is a **container-level environment variable**, not a setting in the Collector web UI or MQTT plugin JSON configuration.
 
-**Note:** The "Active" setting is at the **collector container level** (environment variable in docker-compose.yml), not part of the MQTT plugin configuration JSON. This controls whether the entire collector service is running.
+#### What the Active Setting Controls
 
-**Via environment variable** in `.env` file:
+The `Active` environment variable controls whether the **entire collector service** runs and collects data. Each MQTT plugin configuration has its own `"Enabled": true` setting in the JSON, but the collector itself must be active for any data collection to occur.
+
+**You won't see an "Active" toggle in the Collector web UI** at port 4521.
+
+#### To Enable via Environment Variable
+
+**In Docker Compose** - Edit your `.env` file:
+
 ```bash
-# This is a collector-level setting, not an MQTT plugin setting
+# Collector must be active to collect data
 COLLECTOR_01_ACTIVE=true
 ```
 
-Then restart the stack:
+Then restart the collector:
+
 ```bash
 docker-compose restart timebase-collector-01
 ```
 
-**Configuration file location:**
-- **Docker**: `/collector/config`
-- **Windows**: `C:\ProgramData\Flow Software\Timebase\Collector\Config`
+**In docker-compose.yml** - The Active setting is already configured in the collector template:
+
+```yaml
+environment:
+  Active: "false"  # Change to "true" in your .env file
+```
+
+#### Configuration File Locations
+
+**Docker:** The configuration files are inside the container at:
+- Settings: `/collector/settings` (mapped from volume)
+- Config: `/collector/config` (mapped from volume)
+- Data: `/collector/data` (mapped from volume)
+- Logs: `/collector/logs` (mapped from volume)
+
+These paths correspond to the environment variables in your `docker-compose.yml`.
+
+**Windows:**
+- Config: `C:\Program Data\Flow Software\Timebase\Collector\Config`
+- Settings: `C:\Program Data\Flow Software\Timebase\Collector\Settings`
+- Data: `C:\Program Data\Flow Software\Timebase\Collector\Data`
+
+*Note: There is a space in "Program Data"*
 
 ### Step 3: Create MQTT Plugin Configuration
+
+You have two options for creating MQTT plugin configurations:
+
+#### Option A: Using the Collector Config UI (Recommended for Beginners)
+
+The Collector provides a built-in web interface for managing configurations:
+
+1. Navigate to `http://localhost:4521` in your browser
+2. Click the **Config** tab
+3. Use the visual editor to:
+   - Select "MQTT" as the Data Source Type
+   - Configure Target Historian connection
+   - Edit MQTT Settings JSON
+
+**Configuration files modified by the UI:**
+- `collector.config` - Data source and historian settings
+- `historians.config` - Target historian list
+- `settings.config` - Plugin-specific settings (MQTT, OPC, etc.)
+
+#### Option B: Manually Editing JSON Files
 
 Navigate to the **Plugins** or **Configuration** section and create a new MQTT plugin.
 
@@ -227,7 +296,113 @@ Navigate to the **Plugins** or **Configuration** section and create a new MQTT p
 | `TagnameFields.Default` | `mosquitto.messages_per_minute` | Tag name in Historian |
 | `TagnameIncludesTopic` | `false` | Don't include topic name in tag |
 | `TagnameDelimiter` | `.` | Delimiter for hierarchical tag names |
-| `QoS` | `2` | MQTT Quality of Service: `0`=At most once, `1`=At least once, `2`=Exactly once |
+| `QoS` | `2` | MQTT Quality of Service: `0`=At most once, `1`=At least once, `2`=Exactly once (**default** - recommended for industrial data) |
+
+---
+
+### 🐳 Understanding Docker Networking (IMPORTANT!)
+
+**This is critical for Timebase users running in Docker:**
+
+When configuring connections between Timebase services (Collector → Historian, Explorer → Historian, Collector → MQTT Broker), you **must** understand how Docker networks work.
+
+#### Why `localhost` and `127.0.0.1` Don't Work in Docker
+
+Each Docker container has its **own isolated network namespace**. Inside a container:
+- `localhost` and `127.0.0.1` refer to **that container only**, not your host machine
+- `0.0.0.0` listens on all interfaces but doesn't help with connecting **between** containers
+
+**❌ Common mistakes:**
+```json
+{
+  "Host": "localhost",        // WRONG - points to the container itself
+  "Host": "127.0.0.1",        // WRONG - same issue
+  "Host": "0.0.0.0"           // WRONG - not a valid connection address
+}
+```
+
+#### ✅ Use Container Hostnames Instead
+
+Docker Compose creates a **bridge network** where containers can reach each other using **service names as hostnames**.
+
+**In `docker-compose.yml`, the service names are:**
+- `timebase-historian` → Use hostname `historian`
+- `timebase-collector-01` → Use hostname `collector-01`
+- `timebase-explorer` → Use hostname `explorer`
+
+**Correct configuration examples:**
+
+**Collector connecting to Historian:**
+```json
+{
+  "Name": "Local-Historian",
+  "Url": "http://historian:4511"    // ✅ Use service hostname
+}
+```
+
+**Explorer connecting to Historian:**
+```
+Host: historian                     // ✅ Use service hostname
+Port: 4511
+```
+
+**Collector connecting to MQTT broker in Docker:**
+```json
+{
+  "Host": "mqtt-broker",            // ✅ If broker is in docker-compose
+  "Port": 1883
+}
+```
+
+#### When to Use Different Addresses
+
+| Scenario | Address to Use | Example |
+|----------|----------------|---------|
+| **Container → Container** (same Docker network) | Service hostname | `historian`, `collector-01` |
+| **Container → External Service** (internet/LAN) | Domain name or IP | `test.mosquitto.org`, `192.168.1.100` |
+| **Your Browser → Container** (accessing web UI) | `localhost` or host IP | `http://localhost:4531` |
+| **Container → Host Machine** (special case) | `host.docker.internal` | `host.docker.internal:1883` (Windows/Mac) |
+
+#### Real-World Example
+
+**Scenario:** You have an MQTT broker running on your host machine (not in Docker), and want the Timebase Collector (in Docker) to connect to it.
+
+**❌ Wrong:**
+```json
+{
+  "Host": "localhost",      // Won't work - refers to the container
+  "Port": 1883
+}
+```
+
+**✅ Correct (Windows/Mac):**
+```json
+{
+  "Host": "host.docker.internal",   // Special hostname for host machine
+  "Port": 1883
+}
+```
+
+**✅ Correct (Linux):**
+```json
+{
+  "Host": "172.17.0.1",            // Docker bridge gateway IP
+  "Port": 1883
+}
+```
+Or use `--network host` mode (advanced).
+
+#### Quick Reference
+
+- **Public internet broker:** Use the domain name (`test.mosquitto.org`)
+- **Broker in same Docker Compose stack:** Use service name (`mqtt-broker`)
+- **Broker on host machine (Windows/Mac):** Use `host.docker.internal`
+- **Broker on LAN:** Use LAN IP address (`192.168.1.50`)
+- **Accessing web UI from browser:** Use `localhost:PORT` or `HOST-IP:PORT`
+
+**💡 Tip:** If you see connection errors, check whether you're using the correct hostname for your setup. This is the #1 cause of "connection refused" errors in Docker!
+
+---
 
 ### Step 4: Save and Apply Configuration
 
@@ -235,7 +410,12 @@ Navigate to the **Plugins** or **Configuration** section and create a new MQTT p
 2. The collector should automatically connect to the broker
 3. Data collection begins immediately
 
+</details>
+
 ---
+
+<details open>
+<summary><b>✅ Verifying Data Collection</b></summary>
 
 ## Verifying Data Collection
 
@@ -264,7 +444,12 @@ Navigate to the **Plugins** or **Configuration** section and create a new MQTT p
    - Messages received count increasing
    - Tag `mosquitto.messages_per_minute` listed
 
+</details>
+
 ---
+
+<details open>
+<summary><b>📊 Viewing Data in Explorer</b></summary>
 
 ## Viewing Data in Explorer
 
@@ -326,7 +511,12 @@ Try these Explorer features:
 - View min, max, average values
 - See data quality metrics
 
+</details>
+
 ---
+
+<details>
+<summary><b>🔧 Troubleshooting</b></summary>
 
 ## Troubleshooting
 
@@ -417,6 +607,128 @@ Try these Explorer features:
    Try `broker.hivemq.com` or `broker.emqx.io`
 
 ---
+
+### Problem: "Connection Refused" with localhost/127.0.0.1
+
+**Symptoms:**
+- Collector shows "Connection refused" to `localhost:4511` or `127.0.0.1:4511`
+- Explorer can't connect to Historian at `localhost:4511`
+- Collector can't connect to MQTT broker at `localhost:1883`
+
+**Root Cause:** You're using `localhost` or `127.0.0.1` inside Docker container configuration, which refers to the **container itself**, not your host machine or other containers.
+
+**Solutions:**
+
+#### 1. Connecting Between Containers (Collector → Historian, Explorer → Historian)
+
+**❌ Wrong Configuration:**
+```json
+{
+  "Url": "http://localhost:4511"
+}
+```
+
+**✅ Correct Configuration:**
+```json
+{
+  "Url": "http://historian:4511"    // Use service hostname from docker-compose.yml
+}
+```
+
+**For Explorer:** Use `historian` as the hostname, port `4511`
+
+#### 2. Connecting to Broker on Host Machine
+
+**If your MQTT broker is running on your host** (not in Docker):
+
+**❌ Wrong:**
+```json
+{
+  "Host": "localhost",
+  "Port": 1883
+}
+```
+
+**✅ Correct (Windows/Mac):**
+```json
+{
+  "Host": "host.docker.internal",   // Special Docker hostname for host
+  "Port": 1883
+}
+```
+
+**✅ Correct (Linux):**
+```json
+{
+  "Host": "172.17.0.1",            // Default Docker bridge gateway
+  "Port": 1883
+}
+```
+
+Alternatively, find your actual LAN IP and use that:
+```bash
+# Windows
+ipconfig
+
+# Linux/Mac
+ip addr show
+ifconfig
+```
+
+Then use your LAN IP like `192.168.1.100`.
+
+#### 3. Connecting to Broker in Same Docker Compose Stack
+
+If you've added an MQTT broker to your `docker-compose.yml`:
+
+```json
+{
+  "Host": "mqtt-broker",           // Use the service name from docker-compose.yml
+  "Port": 1883
+}
+```
+
+#### 4. Verify Docker Network
+
+Check that containers are on the same network:
+
+```bash
+# List networks
+docker network ls
+
+# Inspect the timebase network
+docker network inspect timebase-network
+
+# Verify containers can see each other
+docker exec collector-01 ping historian
+docker exec collector-01 nslookup historian
+```
+
+#### 5. Quick Test
+
+Test connectivity from inside the collector container:
+
+```bash
+# Test Historian connectivity
+docker exec collector-01 curl http://historian:4511/api/status
+
+# Test MQTT broker connectivity (if using telnet)
+docker exec collector-01 telnet mqtt-broker 1883
+```
+
+**Key Takeaway:** When configuring services **inside Docker containers**, always use:
+- **Container hostnames** for services in the same Docker Compose stack
+- **host.docker.internal** (or LAN IP) for services on the host machine
+- **Domain names or IPs** for external services
+
+**See also:** [Understanding Docker Networking](#-understanding-docker-networking-important) in the Configuration section.
+
+</details>
+
+---
+
+<details open>
+<summary><b>📦 Understanding Payload Types</b></summary>
 
 ## Understanding Payload Types
 
@@ -687,7 +999,12 @@ Start with what you think it is, then check the Historian:
 
 **Still no data?** Check collector logs for parsing errors - you likely need Type 3.
 
+</details>
+
 ---
+
+<details>
+<summary><b>📚 Click to see detailed configuration examples</b></summary>
 
 ## Detailed Examples
 
@@ -917,6 +1234,27 @@ Type 2 supports **deeply nested JSON** structures. The JSON path becomes the tag
 
 Notice how the **nested structure** automatically creates hierarchical tag names!
 
+#### Important: Array Handling in Type 2
+
+Type 2 **ignores array element names** when creating tag names. Only the JSON path structure matters, and the array element names themselves are not included in the resulting tagname.
+
+**Example with arrays:**
+```json
+{
+  "data": [
+    {
+      "motor1": {
+        "rpm": 23.6
+      }
+    }
+  ]
+}
+```
+
+**Result:** Tag name is `motor1.rpm`, **NOT** `data.motor1.rpm`
+
+The array element name `"data"` is skipped when constructing the tagname. This is different from Type 3, where you explicitly define which fields contain names using `TagnameFields`.
+
 ---
 
 ### Type 3: Structured JSON
@@ -1003,7 +1341,22 @@ Notice how the **nested structure** automatically creates hierarchical tag names
 | `ValueField` | JSON path to the value field |
 | `QualityField` | Optional JSON path to quality/status field |
 
+#### Timestamp Types Reference
+
+| Type | Format | Example | Description |
+|------|--------|---------|-------------|
+| `1` | Unix seconds | `1689526200.234456` | Seconds since epoch (can include fractional seconds) |
+| `2` | Unix milliseconds | `1689526200234.456` | Milliseconds since epoch (**default** for Type 3) |
+| `3` | ISO 8601 string | `2024-07-28T14:30:03Z` or `2024-07-28T12:30:03+02:00` | ISO 8601 formatted date-time strings with timezone |
+
+**Note:** If your payload includes a timestamp field, always specify the correct `TimestampType` to ensure accurate data timestamping. Using the wrong type will result in incorrect timestamps in the Historian.
+
+</details>
+
 ---
+
+<details>
+<summary><b>🔐 Advanced: Secure Broker Authentication</b></summary>
 
 ## Advanced: Secure Broker Authentication
 
@@ -1083,7 +1436,12 @@ The `ClientId` uniquely identifies your collector to the broker:
 }
 ```
 
+</details>
+
 ---
+
+<details>
+<summary><b>🏷️ Advanced: Metadata Extraction with Fields</b></summary>
 
 ## Advanced: Metadata Extraction with Fields
 
@@ -1213,7 +1571,12 @@ Extract metadata from the JSON payload:
     - `Line`: "Line3"
     - `DeviceType`: "PLC"
 
+</details>
+
 ---
+
+<details>
+<summary><b>🎯 Advanced: Tag Filtering with Regex</b></summary>
 
 ## Advanced: Tag Filtering with Regex
 
@@ -1268,7 +1631,12 @@ Use `\\` for backslashes in regex:
 
 **Note:** The `Filter` field defines what to **exclude**, not what to include.
 
+</details>
+
 ---
+
+<details open>
+<summary><b>🚀 Next Steps</b></summary>
 
 ## Next Steps
 
@@ -1340,15 +1708,23 @@ You've learned the basics! Now explore advanced features:
 - **Metadata extraction**: Use `Fields` and `TopicDefinition` (see [Metadata section](#advanced-metadata-extraction-with-fields))
 - **Tag filtering**: Use `Filter` with regex to exclude unwanted tags (see [Filtering section](#advanced-tag-filtering-with-regex))
 - **Authentication**: Connect to secure brokers (see [Authentication section](#advanced-secure-broker-authentication))
-- **Unit of Measure**: Extract UOM from Type 3 payloads using `UOMFields`
+- **Unit of Measure**: Extract UOM from Type 3 payloads using `UOMFields` (see below)
 - **Sparkplug B**: Full support for Sparkplug B protocol (Type 3)
 
-**UOMFields Example (Type 3):**
+#### Extracting Unit of Measure (Type 3)
+
+The `UOMFields` parameter is an **array** of JSON paths to extract units of measure from your payload.
+
+**Configuration:**
 ```json
 {
   "Type": 3,
   "Topics": ["sensors/+"],
-  "TagnameFields": {"Default": "facility"},
+  "TagnameFields": {
+    "Default": "facility",
+    "device": "device",
+    "name": "metric"
+  },
   "ValueField": "value",
   "UOMFields": ["uom"],
   "TimestampFields": ["timestamp"],
@@ -1357,7 +1733,38 @@ You've learned the basics! Now explore advanced features:
 }
 ```
 
-This extracts unit of measure from the `uom` field in your metrics array.
+**Example Payload:**
+```json
+{
+  "timestamp": 1678901234000,
+  "device": "sensor-042",
+  "metrics": [
+    {
+      "name": "temperature",
+      "value": 23.5,
+      "uom": "°C"
+    },
+    {
+      "name": "pressure",
+      "value": 1013,
+      "uom": "hPa"
+    }
+  ]
+}
+```
+
+**Result in Historian:**
+- Tag: `facility.sensors.sensor-042.temperature`
+  - Value: `23.5`
+  - Unit: `°C` ← Extracted from `uom` field
+
+- Tag: `facility.sensors.sensor-042.pressure`
+  - Value: `1013`
+  - Unit: `hPa`
+
+**Note:** `UOMFields` is an array because Timebase tries each path in order. If multiple paths are specified, the last one found is used, or they can be concatenated depending on configuration.
+
+</details>
 
 ---
 

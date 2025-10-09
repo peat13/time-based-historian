@@ -11,6 +11,23 @@
 
 A complete, beginner-friendly Docker Compose stack for deploying a local Industrial Historian infrastructure. This stack provides everything you need to start collecting, storing, and visualizing time-series data.
 
+---
+
+## ⚠️ Disclaimer
+
+**This is an unofficial, community-maintained guide** and is **not affiliated with or endorsed by Flow Software** (the creators of Timebase). While I strive to keep this documentation accurate and up-to-date, discrepancies may exist.
+
+**For official documentation and authoritative guidance, always refer to:**
+- **[Official Timebase Knowledge Base](https://timebase.flow-software.com/en/knowledge-base)** - The definitive source for Timebase documentation
+
+If you find any conflicts between this guide and the official documentation, please:
+1. Trust the official documentation first
+2. Open an issue on this repository so it can be corrected
+
+This guide is provided as-is, without warranty, to help users get started with Timebase in Docker environments.
+
+---
+
 ## What's Included
 
 - **Timebase Historian** (port 4511) - Time-series data storage engine
@@ -148,10 +165,35 @@ All data is stored in Docker named volumes for persistence and portability:
 - `timebase-collector-01-data` - Collector 01 configurations and cache
 - `timebase-explorer-data` - Explorer settings and dashboards
 
+### ⚠️ Data Persistence Warning
+
+**IMPORTANT:** All your historical data is stored in Docker named volumes. If you run:
+
+```bash
+docker-compose down -v  # The -v flag DELETES ALL VOLUMES
+```
+
+**You will lose ALL historical data permanently.** This cannot be undone.
+
+**For safe shutdown:**
+```bash
+docker-compose down  # Stops containers but preserves volumes
+```
+
+### Backing Up Your Data
+
 **To backup your data:**
 ```bash
 docker volume ls                              # List all volumes
 docker volume inspect timebase-historian-data # View volume details
+
+# Backup a volume (example)
+docker run --rm -v timebase-historian-data:/data -v $(pwd):/backup ubuntu tar czf /backup/historian-backup.tar.gz /data
+```
+
+**To restore from backup:**
+```bash
+docker run --rm -v timebase-historian-data:/data -v $(pwd):/backup ubuntu tar xzf /backup/historian-backup.tar.gz -C /data --strip 1
 ```
 
 ## Additional Resources

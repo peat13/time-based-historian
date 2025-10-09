@@ -32,7 +32,6 @@ x-collector-template: &collector-template
   image: timebase/collector:${COLLECTOR_TAG:-latest}
   restart: unless-stopped
   environment:
-    Active: "false"
     Settings: /collector/settings
     Config: /collector/config
     Data: /collector/data
@@ -105,6 +104,7 @@ services:
       Config: /explorer/config
       Data: /explorer/data
       Logs: /explorer/logs
+      HISTORIAN_HOST: ${HISTORIAN_HOSTNAME:-historian}
 
     volumes:
       - explorer-data:/explorer
@@ -114,6 +114,20 @@ services:
 
     depends_on:
       - timebase-historian
+
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        dotnet Timebase.Explorer.UI.dll &
+        EXPLORER_PID=$$!
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          sleep 1
+          if [ -f /explorer/config/sources.config ]; then
+            sed -i 's/"Host": "localhost"/"Host": "${HISTORIAN_HOSTNAME:-historian}"/g' /explorer/config/sources.config 2>/dev/null
+            break
+          fi
+        done
+        wait $$EXPLORER_PID
 
     logging:
       driver: json-file
@@ -131,6 +145,12 @@ services:
     <<: *collector-template
     container_name: ${COLLECTOR_01_CONTAINER_NAME:-collector-01}
     hostname: ${COLLECTOR_01_HOSTNAME:-collector-01}
+    environment:
+      Active: ${COLLECTOR_01_ACTIVE:-false}
+      Settings: /collector/settings
+      Config: /collector/config
+      Data: /collector/data
+      Logs: /collector/logs
     ports:
       - "${COLLECTOR_01_PORT:-4521}:4521"
     volumes:
@@ -146,6 +166,12 @@ services:
   #   <<: *collector-template
   #   container_name: ${COLLECTOR_02_CONTAINER_NAME:-collector-02}
   #   hostname: ${COLLECTOR_02_HOSTNAME:-collector-02}
+  #   environment:
+  #     Active: ${COLLECTOR_02_ACTIVE:-false}
+  #     Settings: /collector/settings
+  #     Config: /collector/config
+  #     Data: /collector/data
+  #     Logs: /collector/logs
   #   ports:
   #     - "${COLLECTOR_02_PORT:-4522}:4521"
   #   volumes:
@@ -158,6 +184,12 @@ services:
   #   <<: *collector-template
   #   container_name: ${COLLECTOR_03_CONTAINER_NAME:-collector-03}
   #   hostname: ${COLLECTOR_03_HOSTNAME:-collector-03}
+  #   environment:
+  #     Active: ${COLLECTOR_03_ACTIVE:-false}
+  #     Settings: /collector/settings
+  #     Config: /collector/config
+  #     Data: /collector/data
+  #     Logs: /collector/logs
   #   ports:
   #     - "${COLLECTOR_03_PORT:-4523}:4521"
   #   volumes:
