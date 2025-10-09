@@ -66,6 +66,7 @@ services:
 
     ports:
       - "${HISTORIAN_PORT:-4511}:4511"
+      # - "${HISTORIAN_HTTPS_PORT:-4512}:4512"  # Uncomment for HTTPS
 
     environment:
       Settings: /historian/settings
@@ -98,6 +99,7 @@ services:
 
     ports:
       - "${EXPLORER_PORT:-4531}:4531"
+      # - "${EXPLORER_HTTPS_PORT:-4532}:4532"  # Uncomment for HTTPS
 
     environment:
       Settings: /explorer/settings
@@ -167,6 +169,7 @@ services:
       Logs: /collector/logs
     ports:
       - "${COLLECTOR_01_PORT:-4521}:4521"
+      # - "${COLLECTOR_01_HTTPS_PORT:-4522}:4522"  # Uncomment for HTTPS
     volumes:
       - collector-01-data:/collector
 
@@ -188,6 +191,7 @@ services:
       Logs: /collector/logs
     ports:
       - "${COLLECTOR_02_PORT:-4522}:4521"
+      # - "${COLLECTOR_02_HTTPS_PORT:-4523}:4522"  # Uncomment for HTTPS
     volumes:
       - collector-02-data:/collector
 

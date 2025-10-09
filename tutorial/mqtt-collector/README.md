@@ -217,11 +217,9 @@ environment:
 These paths correspond to the environment variables in your `docker-compose.yml`.
 
 **Windows:**
-- Config: `C:\Program Data\Flow Software\Timebase\Collector\Config`
-- Settings: `C:\Program Data\Flow Software\Timebase\Collector\Settings`
-- Data: `C:\Program Data\Flow Software\Timebase\Collector\Data`
-
-*Note: There is a space in "Program Data"*
+- Config: `C:\ProgramData\Flow Software\Timebase\Collector\Config`
+- Settings: `C:\ProgramData\Flow Software\Timebase\Collector\Settings`
+- Data: `C:\ProgramData\Flow Software\Timebase\Collector\Data`
 
 ### Step 3: Create MQTT Plugin Configuration
 
@@ -1234,9 +1232,9 @@ Type 2 supports **deeply nested JSON** structures. The JSON path becomes the tag
 
 Notice how the **nested structure** automatically creates hierarchical tag names!
 
-#### Important: Array Handling in Type 2
+#### Important: Array Handling in Type 2 (Observed Behavior)
 
-Type 2 **ignores array element names** when creating tag names. Only the JSON path structure matters, and the array element names themselves are not included in the resulting tagname.
+**Note:** Based on testing, Type 2 appears to skip array element keys when constructing tagnames.
 
 **Example with arrays:**
 ```json
@@ -1251,9 +1249,11 @@ Type 2 **ignores array element names** when creating tag names. Only the JSON pa
 }
 ```
 
-**Result:** Tag name is `motor1.rpm`, **NOT** `data.motor1.rpm`
+**Observed result:** Tag name is `motor1.rpm`, **NOT** `data.motor1.rpm`
 
-The array element name `"data"` is skipped when constructing the tagname. This is different from Type 3, where you explicitly define which fields contain names using `TagnameFields`.
+The array element name `"data"` appears to be skipped when constructing the tagname. This is different from Type 3, where you explicitly define which fields contain names using `TagnameFields`.
+
+⚠️ **This behavior is not explicitly documented in official Timebase docs. Please verify with your specific use case.**
 
 ---
 

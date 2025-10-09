@@ -1,8 +1,8 @@
-# Time Based Local Historian Stack
+# Free Industrial Historian Docker Stack | Timebase Historian for IoT & SCADA
 
 ![Hero Image](images/Hero-image.png)
 
-A complete, beginner-friendly Docker Compose stack for deploying a local Industrial Historian infrastructure. This stack provides everything you need to start collecting, storing, and visualizing time-series data.
+A complete, beginner-friendly Docker Compose stack for deploying a **free industrial historian** infrastructure. Perfect for **manufacturing**, **IoT data logging**, **SCADA systems**, and **OT/IT convergence**. This open-source historian stack provides everything you need to collect, store, and visualize industrial time-series data from PLCs, sensors, MQTT brokers, OPC UA servers, and Modbus devices.
 
 ---
 
@@ -21,17 +21,54 @@ This guide is provided as-is, without warranty, to help users get started with T
 
 ---
 
-## What's Included
+## Why Choose This Industrial Historian?
 
-- **Timebase Historian** (port 4511) - Time-series data storage engine
-- **Timebase Explorer** (port 4531) - Web UI for data visualization
-- **Timebase Collector** (port 4521) - Data collection service
+✨ **Completely FREE Industrial Data Historian** - No licensing fees, no tag limits, no user restrictions
+- **Unlimited tags, users, and queries** - Scale without licensing costs
+- **Free forever guarantee** from Flow Software
+- **Zero hidden costs** or premium tiers for core historian functionality
+- **Store and Forward reliability** - No data loss during network outages
+- **High-performance ingestion** - 25,000 changes/second data collection
+- **REST API** for custom industrial integrations
+- **Docker-ready** for easy deployment in industrial environments
+
+### 🛡️ Industrial-Grade Store and Forward
+
+Enterprise reliability for manufacturing and process control:
+- **Automatic buffering** to local disk during network outages
+- **Continuous data collection** from PLCs, sensors, and industrial devices
+- **Auto-sync** when historian connection restores
+- **Zero data loss** guarantee for critical industrial processes
+
+**Best Practice:** Deploy data collectors near your industrial equipment (separate from historian server) to maximize Store and Forward benefits.
+
+## What's Included in This Historian Stack
+
+- **Timebase Historian** (port 4511) - Industrial time-series database engine
+- **Timebase Explorer** (port 4531) - Web-based SCADA visualization and HMI dashboard
+- **Timebase Collector** (port 4521) - OPC UA, Modbus, MQTT data collection service
+
+## ⚠️ Important: Activating Collectors
+
+**Collectors are disabled by default.** To start collecting data:
+
+1. Edit your `.env` file:
+   ```bash
+   COLLECTOR_01_ACTIVE=true
+   ```
+
+2. Restart the collector:
+   ```bash
+   docker-compose restart timebase-collector-01
+   ```
+
+Without this, your collector will run but **will not collect any data**.
 
 ## Quick Start
 
 ### 🎓 New to Docker or Portainer?
 
-**Start here:** [Our Complete Beginner's Tutorial](tutorial/getting-started.md)
+**Start here:** [Our Complete Beginner's Tutorial](tutorial/README.md)
 
 Our step-by-step guide walks you through:
 - Installing Docker on Ubuntu Server
@@ -63,13 +100,18 @@ docker-compose up -d
 
 Access Timebase Explorer at **http://localhost:4531** and start exploring your data!
 
-> **Note**: For managing files and configurations, we recommend deploying the [File-Browser](https://github.com/DMDuFresne/File-Browser) stack alongside this historian infrastructure.
+## Multi-Source Industrial Data Collection
 
-## Adding Multiple Collectors
+One of the most powerful features of this historian stack is the ability to easily add multiple data collectors for different industrial protocols and data sources.
 
-One of the most powerful features of this stack is the ability to easily add multiple collectors. Each collector can gather data from different sources.
+**Supported Industrial Protocols:**
+- **OPC UA** - Modern industrial automation standard
+- **Modbus TCP/RTU** - Legacy PLC and RTU communication
+- **MQTT** - IoT sensors and edge devices
+- **REST APIs** - Custom industrial integrations
+- **And more** - Extensible plugin architecture
 
-**To add a second collector:**
+**To add a second collector for different data sources:**
 
 1. Open `docker-compose.yml`
 2. Find and uncomment the `timebase-collector-02` service in the Services section
@@ -78,7 +120,7 @@ One of the most powerful features of this stack is the ability to easily add mul
 
 That's it! The second collector will be available at **http://localhost:4522**
 
-You can add as many collectors as you need - just follow the same pattern for `collector-03`, `collector-04`, etc.
+You can add as many collectors as you need for distributed industrial data collection - just follow the same pattern for `collector-03`, `collector-04`, etc.
 
 ## Configuration
 
@@ -150,13 +192,13 @@ docker-compose up -d
 docker-compose restart timebase-collector
 ```
 
-## Data Management
+## Industrial Data Management & Historian Database
 
-All data is stored in Docker named volumes for persistence and portability:
+All industrial time-series data is stored in Docker named volumes for persistence and portability:
 
-- `timebase-historian-data` - Time-series database storage
-- `timebase-collector-01-data` - Collector 01 configurations and cache
-- `timebase-explorer-data` - Explorer settings and dashboards
+- `timebase-historian-data` - Industrial historian time-series database storage
+- `timebase-collector-01-data` - Data collector configurations and local cache
+- `timebase-explorer-data` - SCADA/HMI explorer settings and dashboards
 
 ### ⚠️ Data Persistence Warning
 
@@ -173,9 +215,9 @@ docker-compose down -v  # The -v flag DELETES ALL VOLUMES
 docker-compose down  # Stops containers but preserves volumes
 ```
 
-### Backing Up Your Data
+### Backing Up Industrial Historian Data
 
-**To backup your data:**
+**To backup your historian time-series data:**
 ```bash
 docker volume ls                              # List all volumes
 docker volume inspect timebase-historian-data # View volume details
@@ -184,24 +226,36 @@ docker volume inspect timebase-historian-data # View volume details
 docker run --rm -v timebase-historian-data:/data -v $(pwd):/backup ubuntu tar czf /backup/historian-backup.tar.gz /data
 ```
 
-**To restore from backup:**
+**To restore historian data from backup:**
 ```bash
 docker run --rm -v timebase-historian-data:/data -v $(pwd):/backup ubuntu tar xzf /backup/historian-backup.tar.gz -C /data --strip 1
 ```
 
+## Use Cases for This Industrial Historian
+
+This free historian stack is perfect for:
+- **Manufacturing Data Logging** - Track production metrics, OEE, and equipment performance
+- **SCADA Historian** - Long-term storage for SCADA systems and process control data
+- **IoT Industrial Data** - Collect and analyze sensor data from industrial IoT devices
+- **OPC UA Data Archival** - Store historical PLC and automation data
+- **Energy Management** - Monitor power consumption and environmental metrics
+- **Predictive Maintenance** - Analyze equipment trends and predict failures
+- **Quality Tracking** - Store quality metrics and traceability data
+
 ## Additional Resources
 
-### Timebase
+### Industrial Historian Documentation
 - **Timebase Documentation**: <https://timebase.flow-software.com/en/knowledge-base>
 
-### Docker & Portainer
+### Docker & Container Deployment
 - **Docker Installation**: <https://docs.docker.com/engine/install/>
 - **Docker Compose**: <https://docs.docker.com/compose/>
 - **Portainer Installation**: <https://docs.portainer.io/start/install-ce/server/docker/linux>
 
-### Tutorials
-- **Getting Started**: [Complete setup guide](tutorial/getting-started.md) - Install Docker, Portainer, and deploy this stack
-- **MQTT Collector**: [Collecting real-world data](tutorial/mqtt-collector/) - Connect to MQTT brokers and collect data
+### Getting Started Tutorials
+- **Complete Setup Guide**: [Install Docker, Portainer, and deploy this historian stack](tutorial/README.md)
+- **MQTT Data Collection**: [Collect IoT and industrial data from MQTT brokers](tutorial/mqtt-collector/)
+- **OPC UA Integration**: Configure OPC UA data collection from PLCs and automation systems
 
 ## License
 

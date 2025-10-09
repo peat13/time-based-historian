@@ -19,7 +19,10 @@ This step-by-step guide will take you from a fresh Ubuntu Server installation to
 - A server or PC running Ubuntu Server (20.04 or newer recommended)
 - SSH access to your server (or direct terminal access)
 - Internet connection
-- At least 2GB RAM and 20GB free disk space
+- **Minimum Requirements:**
+  - **8GB RAM** (4GB for Historian + 4GB for other services)
+  - **4 CPU cores** at 2.7 GHz or higher
+  - **50GB free disk space** (250GB recommended for production)
 - Your server's IP address (find it with `ip addr` or `hostname -I`)
 
 **Time Required:** About 20-30 minutes
@@ -121,6 +124,22 @@ sudo systemctl start docker
 **What this does:** Ensures Docker starts automatically when your server boots up.
 
 ✅ **Docker is now installed!** Let's move on to Portainer.
+
+### ⚠️ Critical: Anti-Virus Exclusion (Windows Only)
+
+If running Timebase on Windows (not Docker), you **MUST** exclude the Historian data directory from anti-virus scanning:
+
+**Path to exclude:**
+```
+C:\ProgramData\Flow Software\Timebase\Historian\Data
+```
+
+**Why:** Without this exclusion, anti-virus software will continuously scan files during data writes, causing:
+- Severe performance degradation
+- Potential data corruption
+- System instability
+
+**Configure exclusion immediately after installation.**
 
 ---
 
@@ -290,9 +309,11 @@ Your Timebase services are now accessible via your web browser.
 **First-time setup:**
 1. Open the URL in your browser
 2. Follow the Timebase Explorer setup wizard
-3. Connect to the Historian at: `http://historian:4511`
-   - Note: Use `historian` as the hostname (not your server IP)
-   - This is the internal Docker network name
+3. Enter Historian connection details:
+   - **Host**: `historian` *(internal Docker hostname - do not use `localhost`)*
+   - **Port**: `4511`
+   - **Note:** Use the hostname `historian`, not an IP address or `localhost`. This is Docker's internal network name.
+   - Click **"Connect"** or **"Save"**
 
 ### Timebase Historian API
 
