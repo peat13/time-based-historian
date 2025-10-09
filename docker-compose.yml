@@ -1,120 +1,243 @@
-# ----------------------------------------------------------------------------------------------------
-# Portainer Template for Timebase Infrastructure
-# Includes Timebase Historian, Explorer, Collector, Node-RED, and Mosquitto MQTT Broker
-# ----------------------------------------------------------------------------------------------------
-# References:
-# - https://timebase.flow-software.com/en/knowledge-base/start-here
-# - https://github.com/node-red/node-red
-# - https://mosquitto.org/
-# ----------------------------------------------------------------------------------------------------
+# ==================================================================================================
+# Timebase Infrastructure Stack - Docker Compose
+# ==================================================================================================
+#
+# 🚀 QUICK START:
+#   1. Copy example.env to .env (optional - defaults work out of the box!)
+#   2. Run: docker-compose up -d
+#   3. Access Timebase Explorer at http://localhost:4531
+#
+# 📚 DOCUMENTATION:
+#   - Timebase Docs: https://timebase.flow-software.com/en/knowledge-base
+#   - This project: See README.md for detailed setup instructions
+#
+# 🔧 WHAT'S INCLUDED:
+#   - Timebase Historian (port 4511) - Time-series data storage engine
+#   - Timebase Explorer (port 4531)  - Web UI for data visualization
+#   - Timebase Collector (port 4521) - Data collection service
+#
+# 💡 ADDING MORE COLLECTORS:
+#   See the commented collector-2 example below - just uncomment and customize!
+#
+# ==================================================================================================
+
+# ==================================================================================================
+# 🎯 EXTENSION TEMPLATES
+# ==================================================================================================
+# These are reusable templates that make it easy to add multiple collectors.
+# They are not services themselves - think of them as blueprints.
+# ==================================================================================================
+
+x-collector-template: &collector-template
+  image: timebase/collector:${COLLECTOR_TAG:-latest}
+  restart: unless-stopped
+  environment:
+    Active: "false"
+    Settings: /collector/settings
+    Config: /collector/config
+    Data: /collector/data
+    Logs: /collector/logs
+  networks:
+    - timebase-network
+  depends_on:
+    - timebase-historian
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+# ==================================================================================================
+# 🐳 SERVICES
+# ==================================================================================================
 
 services:
 
-  # Timebase Historian Service
+  # ------------------------------------------------------------------------------------------------
+  # Timebase Historian - Core time-series database
+  # ------------------------------------------------------------------------------------------------
+  # This is the heart of the system. All data flows through the Historian.
+  # Must be running before Collector and Explorer can connect.
+  # ------------------------------------------------------------------------------------------------
   timebase-historian:
-    image: timebase/historian:${HISTORIAN_TAG:-latest}                            # Docker image for Timebase Historian with variable tag
-    hostname: ${HISTORIAN_HOSTNAME:-historian}                                    # Hostname used for internal networking
-    container_name: ${HISTORIAN_CONTAINER_NAME:-historian}                        # Container name for easier management
-    ports:
-      - "${HISTORIAN_PORT:-4511}:4511"                                            # Map the Historian REST API port
-    restart: unless-stopped                                                       # Automatically restart unless stopped manually
-    environment:
-      - Settings=/historian/settings                                              # Path to the settings file
-      - Data=/historian/data                                                      # Path to the data directory
-      - Logs=/historian/logs                                                      # Path to the logs directory
-    volumes:
-      - /portainer/Files/AppData/Config/timebase/historian:/historian
-    networks:
-      - timebase-network                                                          # Connect to the shared application network
+    image: timebase/historian:${HISTORIAN_TAG:-latest}
+    container_name: ${HISTORIAN_CONTAINER_NAME:-historian}
+    hostname: ${HISTORIAN_HOSTNAME:-historian}
+    restart: unless-stopped
 
-  # Timebase Collector Service
-  timebase-collector:
-    image: timebase/collector:${COLLECTOR_TAG:-latest}                            # Docker image for Timebase Collector with variable tag
-    hostname: ${COLLECTOR_HOSTNAME:-collector}                                    # Hostname used for internal networking
-    container_name: ${COLLECTOR_CONTAINER_NAME:-collector}                        # Container name for easier management
     ports:
-      - "${COLLECTOR_PORT:-4521}:4521"                                            # Map the Collector REST API port
-    restart: unless-stopped                                                       # Automatically restart unless stopped manually
-    depends_on:
-      - timebase-historian                                                        # Ensure this service starts after the Historian
-    environment:
-      - Active=false                                                              # Set the initial state of the Collector service
-      - Settings=/collector/settings                                              # Path to the settings file
-      - Config=/collector/config                                                  # Path to the config directory
-      - Data=/collector/data                                                      # Path to the data directory
-      - Logs=/collector/logs                                                      # Path to the logs directory
-    volumes:
-      - /portainer/Files/AppData/Config/timebase/collector:/collector
-    networks:
-      - timebase-network                                                          # Connect to the shared application network
+      - "${HISTORIAN_PORT:-4511}:4511"
 
-  # Timebase Explorer Service
+    environment:
+      Settings: /historian/settings
+      Data: /historian/data
+      Logs: /historian/logs
+
+    volumes:
+      - historian-data:/historian
+
+    networks:
+      - timebase-network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ------------------------------------------------------------------------------------------------
+  # Timebase Explorer - Web-based UI
+  # ------------------------------------------------------------------------------------------------
+  # The web interface for visualizing and analyzing your time-series data.
+  # Access it at http://localhost:4531 after starting the stack.
+  # ------------------------------------------------------------------------------------------------
   timebase-explorer:
-    image: timebase/explorer:${EXPLORER_TAG:-latest}                              # Docker image for Timebase Explorer with variable tag
-    hostname: ${EXPLORER_HOSTNAME:-explorer}                                      # Hostname used for internal networking
-    container_name: ${EXPLORER_CONTAINER_NAME:-explorer}                          # Container name for easier management
+    image: timebase/explorer:${EXPLORER_TAG:-latest}
+    container_name: ${EXPLORER_CONTAINER_NAME:-explorer}
+    hostname: ${EXPLORER_HOSTNAME:-explorer}
+    restart: unless-stopped
+
     ports:
-      - "${EXPLORER_PORT:-4531}:4531"                                             # Map the Explorer Web UI port
-    restart: unless-stopped                                                       # Automatically restart unless stopped manually
-    depends_on:
-      - timebase-historian                                                        # Ensure this service starts after the Historian
+      - "${EXPLORER_PORT:-4531}:4531"
+
     environment:
-      - Settings=/explorer/settings                                               # Path to the settings file
-      - Config=/explorer/config                                                   # Path to the config directory
-      - Data=/explorer/data                                                       # Path to the data directory
-      - Logs=/explorer/logs                                                       # Path to the logs directory
-    volumes:
-      - /portainer/Files/AppData/Config/timebase/explorer:/explorer
-    networks:
-      - timebase-network                                                          # Connect to the shared application network
+      Settings: /explorer/settings
+      Config: /explorer/config
+      Data: /explorer/data
+      Logs: /explorer/logs
 
-  # Node-RED Service
-  node-red:
-    image: nodered/node-red:${NODERED_TAG:-latest}                                # Docker image for Node-RED with variable tag
-    hostname: ${NODERED_HOSTNAME:-node-red}                                       # Hostname used for internal networking
-    container_name: ${NODERED_CONTAINER_NAME:-node-red}                           # Container name for easier management
-    ports:
-      - "${NODERED_PORT:-1880}:1880"                                              # Map the Node-RED Web UI port
-    restart: unless-stopped                                                       # Automatically restart unless stopped manually
+    volumes:
+      - explorer-data:/explorer
+
+    networks:
+      - timebase-network
+
     depends_on:
-      - mqtt-broker                                                               # Ensure this service starts after MQTT Broker
-    volumes:
-      - node-red-data:/data                   # Bind mount for Node-RED data
-    networks:
-      - timebase-network                                                          # Connect to the shared application network
+      - timebase-historian
 
-  # Mosquitto MQTT Broker Service
-  mqtt-broker:
-    image: eclipse-mosquitto:${MOSQUITTO_TAG:-latest}                              # Docker image for Mosquitto MQTT Broker
-    hostname: ${MOSQUITTO_HOSTNAME:-broker}                                        # Hostname used for internal networking
-    container_name: ${MOSQUITTO_CONTAINER_NAME:-mosquitto}                         # Container name for easier management
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ------------------------------------------------------------------------------------------------
+  # Timebase Collector 01 - Data collection service
+  # ------------------------------------------------------------------------------------------------
+  # Collectors gather data from various sources and send it to the Historian.
+  # This uses the x-collector-template defined above for easy duplication.
+  # ------------------------------------------------------------------------------------------------
+  timebase-collector-01:
+    <<: *collector-template
+    container_name: ${COLLECTOR_01_CONTAINER_NAME:-collector-01}
+    hostname: ${COLLECTOR_01_HOSTNAME:-collector-01}
     ports:
-      - "${MOSQUITTO_MQTT_PORT:-1883}:1883"                                        # Map the MQTT port
-    restart: unless-stopped                                                        # Automatically restart unless stopped manually
-    command: |
-      sh -c "
-      echo 'listener 1883 0.0.0.0
-      allow_anonymous true
-      log_type error
-      log_type warning
-      log_type notice
-      log_type information
-      persistence true
-      persistence_location /mosquitto/data/' > /mosquitto/config/mosquitto.conf &&
-      mosquitto -c /mosquitto/config/mosquitto.conf
-      "
+      - "${COLLECTOR_01_PORT:-4521}:4521"
     volumes:
-      - /portainer/Files/AppData/Config/timebase/mosquitto/config:/mosquitto/config  # Bind mount for config
-      - /portainer/Files/AppData/Config/timebase/mosquitto/data:/mosquitto/data      # Bind mount for data
-      - /portainer/Files/AppData/Config/timebase/mosquitto/log:/mosquitto/log        # Bind mount for logs
-    networks:
-      - timebase-network                                                           # Connect to the shared application network
+      - collector-01-data:/collector
+
+  # ------------------------------------------------------------------------------------------------
+  # 💡 EXAMPLE: Adding a second collector
+  # ------------------------------------------------------------------------------------------------
+  # Uncomment the lines below to add a second collector.
+  # Customize the environment variables in example.env if needed.
+  # ------------------------------------------------------------------------------------------------
+  # timebase-collector-02:
+  #   <<: *collector-template
+  #   container_name: ${COLLECTOR_02_CONTAINER_NAME:-collector-02}
+  #   hostname: ${COLLECTOR_02_HOSTNAME:-collector-02}
+  #   ports:
+  #     - "${COLLECTOR_02_PORT:-4522}:4521"
+  #   volumes:
+  #     - collector-02-data:/collector
+
+  # ------------------------------------------------------------------------------------------------
+  # 💡 EXAMPLE: Adding a third collector
+  # ------------------------------------------------------------------------------------------------
+  # timebase-collector-03:
+  #   <<: *collector-template
+  #   container_name: ${COLLECTOR_03_CONTAINER_NAME:-collector-03}
+  #   hostname: ${COLLECTOR_03_HOSTNAME:-collector-03}
+  #   ports:
+  #     - "${COLLECTOR_03_PORT:-4523}:4521"
+  #   volumes:
+  #     - collector-03-data:/collector
+
+
+# ==================================================================================================
+# 💾 VOLUMES
+# ==================================================================================================
+# Named volumes for persistent data storage.
+# Your data is stored here even when containers are recreated.
+#
+# 📍 FINDING YOUR DATA:
+#   - List volumes: docker volume ls
+#   - Inspect volume: docker volume inspect timebase-historian-data
+#   - Location: Usually /var/lib/docker/volumes/ on Linux
+#
+# 🗑️  REMOVING DATA:
+#   - docker-compose down -v (⚠️  deletes all data!)
+#   - docker volume rm timebase-historian-data (specific volume)
+# ==================================================================================================
 
 volumes:
-  node-red-data:
+  historian-data:
+    name: ${HISTORIAN_VOLUME_NAME:-timebase-historian-data}
 
-# Dedicated network for service communication
+  collector-01-data:
+    name: ${COLLECTOR_01_VOLUME_NAME:-timebase-collector-01-data}
+
+  # Uncomment these if you add collector-02 and collector-03
+  # collector-02-data:
+  #   name: ${COLLECTOR_02_VOLUME_NAME:-timebase-collector-02-data}
+  # collector-03-data:
+  #   name: ${COLLECTOR_03_VOLUME_NAME:-timebase-collector-03-data}
+
+  explorer-data:
+    name: ${EXPLORER_VOLUME_NAME:-timebase-explorer-data}
+
+# ==================================================================================================
+# 🌐 NETWORK
+# ==================================================================================================
+# All services communicate through this network using their hostnames.
+# Example: Collector connects to Historian using "http://historian:4511"
+# ==================================================================================================
+
 networks:
   timebase-network:
-    name: timebase-network
+    name: ${NETWORK_NAME:-timebase-network}
     driver: bridge
+
+# ==================================================================================================
+# 🎓 NEXT STEPS
+# ==================================================================================================
+#
+# 1. START THE STACK:
+#    docker-compose up -d
+#
+# 2. CHECK STATUS:
+#    docker-compose ps
+#
+# 3. VIEW LOGS:
+#    docker-compose logs -f                    # All services
+#    docker-compose logs -f timebase-historian # Specific service
+#
+# 4. ACCESS SERVICES:
+#    - Timebase Explorer: http://localhost:4531
+#    - Historian API: http://localhost:4511
+#    - Collector API: http://localhost:4521
+#
+# 5. STOP THE STACK:
+#    docker-compose down                       # Stop and remove containers
+#    docker-compose down -v                    # Also remove volumes (⚠️  deletes data!)
+#
+# 6. UPDATE IMAGES:
+#    docker-compose pull                       # Download latest images
+#    docker-compose up -d                      # Recreate containers with new images
+#
+# ==================================================================================================
+# Need help? Check out:
+# - README.md in this repository
+# - https://timebase.flow-software.com/en/knowledge-base
+# - https://docs.docker.com/compose/
+# ==================================================================================================

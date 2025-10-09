@@ -9,140 +9,164 @@
    ╚═╝    ╚═╝ ╚═╝     ╚═╝ ╚══════╝    ╚═════╝  ╚═╝  ╚═╝ ╚══════╝ ╚══════╝ ╚═════╝ 
 ```
 
-A Docker Compose stack for deploying a local Industrial Historian infrastructure that includes:
+A complete, beginner-friendly Docker Compose stack for deploying a local Industrial Historian infrastructure. This stack provides everything you need to start collecting, storing, and visualizing time-series data.
 
-- **Timebase Historian**: A time-series data historian.
-- **Timebase Collector**: Collects and organizes time-series data.
-- **Timebase Explorer**: Provides visualization and exploration tools.
-- **Node-RED**: A flow-based development tool for wiring IoT systems.
-- **Mosquitto MQTT Broker**: A scalable MQTT broker for real-time data.
+## What's Included
+
+- **Timebase Historian** (port 4511) - Time-series data storage engine
+- **Timebase Explorer** (port 4531) - Web UI for data visualization
+- **Timebase Collector** (port 4521) - Data collection service
+
+## Quick Start
+
+### 🎓 New to Docker or Portainer?
+
+**Start here:** [Our Complete Beginner's Tutorial](tutorial/getting-started.md)
+
+Our step-by-step guide walks you through:
+- Installing Docker on Ubuntu Server
+- Installing Portainer for easy management
+- Deploying this stack via Portainer's web interface
+- Troubleshooting common issues
+
+**Want to learn more?** Check out the official documentation:
+- [Docker Installation Guide](https://docs.docker.com/engine/install/) - Install Docker on various platforms
+- [Portainer Installation Guide](https://docs.portainer.io/start/install-ce/server/docker/linux) - Install Portainer Community Edition
+- [Timebase Knowledgebase](https://timebase.flow-software.com/en/knowledge-base) - Get to know Timebase
+
+### 🚀 Already Have Docker?
+
+Get up and running in 3 simple steps:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/DMDuFresne/time-based-historian.git
+cd time-based-historian
+
+# 2. (Optional) Customize your configuration
+cp example.env .env
+# Edit .env if you need to change ports or other settings
+
+# 3. Start the stack
+docker-compose up -d
+```
+
+Access Timebase Explorer at **http://localhost:4531** and start exploring your data!
 
 > **Note**: For managing files and configurations, we recommend deploying the [File-Browser](https://github.com/DMDuFresne/File-Browser) stack alongside this historian infrastructure.
 
-## Environment Variables
+## Adding Multiple Collectors
 
-The stack uses an `.env` file for configuration. Below are the variables used and their default values:
+One of the most powerful features of this stack is the ability to easily add multiple collectors. Each collector can gather data from different sources.
 
-```plaintext
-# Timebase Historian
-HISTORIAN_TAG=latest
-HISTORIAN_HOSTNAME=historian
-HISTORIAN_CONTAINER_NAME=historian
-HISTORIAN_PORT=4511
+**To add a second collector:**
+
+1. Open `docker-compose.yml`
+2. Find and uncomment the `timebase-collector-02` service in the Services section
+3. Find and uncomment the `collector-02-data` volume in the Volumes section
+4. Run: `docker-compose up -d`
+
+That's it! The second collector will be available at **http://localhost:4522**
+
+You can add as many collectors as you need - just follow the same pattern for `collector-03`, `collector-04`, etc.
+
+## Configuration
+
+The stack works out of the box with sensible defaults, but you can customize everything via environment variables.
+
+**Common customizations:**
+
+```bash
+# Use specific versions instead of 'latest'
+HISTORIAN_TAG=v2.1.0
+COLLECTOR_TAG=v2.1.0
+EXPLORER_TAG=v2.1.0
+
+# Change ports if defaults are taken
+HISTORIAN_PORT=5511
+EXPLORER_PORT=5531
+COLLECTOR_PORT=5521
+
+# Set timezone
+TZ=America/New_York
+
+# Start collector 01 immediately
+COLLECTOR_01_ACTIVE=true
 ```
 
-```plaintext
-# Timebase Collector
-COLLECTOR_TAG=latest
-COLLECTOR_HOSTNAME=collector
-COLLECTOR_CONTAINER_NAME=collector
-COLLECTOR_PORT=4521
-```
-
-```plaintext
-# Timebase Explorer
-EXPLORER_TAG=latest
-EXPLORER_HOSTNAME=explorer
-EXPLORER_CONTAINER_NAME=explorer
-EXPLORER_PORT=4531
-```
-
-```plaintext
-# Node-RED
-NODERED_TAG=latest
-NODERED_HOSTNAME=node-red
-NODERED_CONTAINER_NAME=node-red
-NODERED_PORT=1880
-```
-
-```plaintext
-# Mosquitto MQTT Broker
-MOSQUITTO_TAG=latest
-MOSQUITTO_HOSTNAME=mqtt-broker
-MOSQUITTO_CONTAINER_NAME=mqtt-broker
-MOSQUITTO_MQTT_PORT=1883
-```
+See `example.env` for all available options with detailed comments.
 
 ## Deploying in Portainer
 
-1. **Go to Portainer Stacks**:
-   Log in to your Portainer instance and navigate to the **Stacks** section.
+This stack works great with Portainer for easy management via a web interface.
 
-2. **Add a new stack**:
-   - Click **Add Stack**.
-   - Provide a name (e.g., `time-based-historian`).
+1. **Log in to Portainer** and navigate to **Stacks**
 
-3. **Deploy from Git**:
-   - Select the **Git Repository** option.
-   - Enter the Git repository URL (e.g., `https://github.com/DMDuFresne/time-based-historian.git`).
-   - Specify the branch (e.g., `main`) and the path to `docker-compose.yml`.
+2. **Add a new stack** with these settings:
+   - Name: `time-based-historian`
+   - Build method: **Git Repository**
+   - Repository URL: `https://github.com/DMDuFresne/time-based-historian.git`
+   - Branch: `main`
 
-4. **Set environment variables**:
-   - Use the **Variables** tab to input the variables from the `example.env` file or customize them in the stack editor.
+3. **Customize environment variables** (optional):
+   - Use the **Environment variables** section to override any defaults
+   - See `example.env` for available options
 
-5. **Deploy the stack**:
-   - Click **Deploy the stack** to launch the services.
+4. **Deploy the stack** and access Timebase Explorer at **http://your-server:4531**
 
-6. **Monitor and manage the stack**:
-   - Use Portainer's dashboard to view logs, restart containers, or troubleshoot any issues.
+## Useful Commands
 
-## Run Locally with Docker Compose
+```bash
+# View status of all services
+docker-compose ps
 
-1. **Clone the repository**:
+# View logs (all services)
+docker-compose logs -f
 
-   ```bash
-   git clone https://github.com/DMDuFresne/time-based-historian.git
-   cd time-based-historian
-   ```
+# View logs (specific service)
+docker-compose logs -f timebase-historian
 
-2. **Create an `.env` file**:
+# Stop the stack (containers removed, data preserved)
+docker-compose down
 
-   ```bash
-   cp example.env .env
-   ```
+# Stop and remove data (⚠️ deletes everything!)
+docker-compose down -v
 
-   Edit `.env` to customize your configuration as needed.
+# Update to latest images
+docker-compose pull
+docker-compose up -d
 
-3. **Start the stack**:
+# Restart a specific service
+docker-compose restart timebase-collector
+```
 
-   ```bash
-   docker-compose up -d
-   ```
+## Data Management
 
-4. **Verify the services**:
+All data is stored in Docker named volumes for persistence and portability:
 
-   ```bash
-   docker-compose ps
-   ```
+- `timebase-historian-data` - Time-series database storage
+- `timebase-collector-01-data` - Collector 01 configurations and cache
+- `timebase-explorer-data` - Explorer settings and dashboards
 
-5. **Stop the stack**:
+**To backup your data:**
+```bash
+docker volume ls                              # List all volumes
+docker volume inspect timebase-historian-data # View volume details
+```
 
-   ```bash
-   docker-compose down
-   ```
+## Additional Resources
 
-## Notes
+### Timebase
+- **Timebase Documentation**: <https://timebase.flow-software.com/en/knowledge-base>
 
-- Ensure your Docker engine and Portainer instance have adequate resources for the services.
-- All services use persistent volumes to store data. These volumes are defined in `docker-compose.yml`.
-- Health checks are included for all services to monitor their readiness and availability.
+### Docker & Portainer
+- **Docker Installation**: <https://docs.docker.com/engine/install/>
+- **Docker Compose**: <https://docs.docker.com/compose/>
+- **Portainer Installation**: <https://docs.portainer.io/start/install-ce/server/docker/linux>
 
-## File Management
-
-For managing files and configurations across your Time Based Historian stack, we recommend using the [File-Browser](https://github.com/DMDuFresne/File-Browser) repository. This provides a lightweight file manager that can be deployed alongside your historian stack to:
-
-- Browse, upload, and download files
-- Manage configurations
-- Access logs and data files
-- Organize your historian infrastructure files
-
-The File-Browser can be deployed as a separate stack in Portainer and will provide a web-based interface for managing all your files.
-
-## Help and Configuration
-
-- Timebase: <https://timebase.flow-software.com/en/knowledge-base>
-- Node Red: <https://nodered.org/docs/user-guide/editor/>
-- Mosquitto: <https://mosquitto.org/documentation/>
+### Tutorials
+- **Getting Started**: [Complete setup guide](tutorial/getting-started.md) - Install Docker, Portainer, and deploy this stack
+- **MQTT Collector**: [Collecting real-world data](tutorial/mqtt-collector/) - Connect to MQTT brokers and collect data
 
 ## License
 
